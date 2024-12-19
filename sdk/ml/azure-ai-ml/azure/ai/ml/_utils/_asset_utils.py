@@ -240,6 +240,14 @@ def _parse_name_version(
     return ":".join(name), version
 
 
+def get_file_hash(filename: Union[str, os.PathLike], chunk_size: int = 4096) -> str:
+    _hash = hashlib.sha256()
+    with open(str(filename), "rb") as f:
+        for chunk in iter(lambda: f.read(chunk_size), b""):
+            _hash.update(chunk)
+        return _hash.hexdigest().upper()
+
+
 def _get_file_hash(filename: Union[str, os.PathLike], _hash: hash_type) -> hash_type:
     with open(str(filename), "rb") as f:
         for chunk in iter(lambda: f.read(CHUNK_SIZE), b""):

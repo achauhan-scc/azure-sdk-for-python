@@ -29,6 +29,9 @@ from azure.ai.ml._utils._asset_utils import (
     _get_latest,
     _get_next_version_from_container,
     _resolve_label_to_asset,
+    get_file_hash,
+    get_ignore_file,
+    get_upload_files_from_folder,
 )
 from azure.ai.ml._utils._azureml_polling import AzureMLPolling
 from azure.ai.ml._utils._endpoint_utils import polling_wait
@@ -725,6 +728,16 @@ class ComponentOperations(_ScopeDependentOperations):
             version=version,
             label=label,
         )
+
+    def prepare_for_sign(self, component: Component):
+        if isinstance(component, ComponentCodeMixin):
+            with component._build_code() as code:
+                ignore_file = get_ignore_file(code.path) if code.ignore_file is None else ignore_file
+                file_list = get_upload_files_from_folder(code.path, ignore_file=ignore_file)
+                hash_dic = {}
+                for file_path, file_name in sorted(file_list, key=lambda x: str(x[1]).lower()):
+                    file_hash = get_file_hash(file_path)
+                    hash_dic[file_name] = file_hash
 
     def _get_latest_version(self, component_name: str) -> Component:
         """Returns the latest version of the asset with the given name.
