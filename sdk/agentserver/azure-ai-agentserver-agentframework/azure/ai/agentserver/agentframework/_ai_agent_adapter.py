@@ -54,6 +54,20 @@ class AgentFrameworkAIAgentAdapter(AgentFrameworkAgent):
                 request_input,
                 agent_thread=agent_thread)
             logger.debug("Transformed input message type: %s", type(message))
+
+            # Attach per-request context to the agent instance so tools can access it
+            # without LLM involvement. Combines HTTP headers and request metadata.
+            request_context: dict[str, Any] = {}
+            if context.headers:
+                request_context.update(context.headers)
+            # Extract user token from request body metadata (Vnext infra strips auth
+            # headers, so the REST API layer embeds the token in metadata instead).
+            metadata = context.raw_payload.get("metadata", {})
+            if isinstance(metadata, dict) and metadata.get("user_token"):
+                request_context["authorization"] = metadata["user_token"]
+                logger.info("[DEBUG] Found user_token in request metadata")
+            self._agent._request_headers = request_context  # type: ignore[attr-defined]
+
             # Use split converters
             if context.stream:
                 return self._run_streaming_updates(

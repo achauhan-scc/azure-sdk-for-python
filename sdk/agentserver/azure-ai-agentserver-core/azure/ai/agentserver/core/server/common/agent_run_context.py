@@ -16,13 +16,14 @@ class AgentRunContext:
     """
     :meta private:
     """
-    def __init__(self, payload: dict) -> None:
+    def __init__(self, payload: dict, headers: dict | None = None) -> None:
         self._raw_payload = payload
         self._request = _deserialize_create_response(payload)
         self._id_generator = FoundryIdGenerator.from_request(payload)
         self._response_id = self._id_generator.response_id
         self._conversation_id = self._id_generator.conversation_id
         self._stream = self.request.get("stream", False)
+        self._headers = headers or {}
 
     @property
     def raw_payload(self) -> dict:
@@ -47,6 +48,16 @@ class AgentRunContext:
     @property
     def stream(self) -> bool:
         return self._stream
+
+    @property
+    def headers(self) -> dict:
+        """HTTP request headers captured from the incoming request.
+
+        Useful for extracting authentication tokens or other per-request metadata
+        that should be passed through to the agent or its tools without being
+        exposed to the LLM.
+        """
+        return self._headers
 
     def get_agent_id_object(self) -> AgentId:
         agent = self.request.get("agent")
