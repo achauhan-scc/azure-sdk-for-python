@@ -37,34 +37,6 @@ class AgentFrameworkAIAgentAdapter(AgentFrameworkAgent):
         super().__init__(credentials, thread_repository, project_endpoint=project_endpoint, **kwargs)
         self._agent = agent
 
-    @staticmethod
-    def _extract_user_token(metadata: dict) -> str | None:
-        """Reassemble user token from metadata.
-
-        Supports:
-        - Single key: metadata["user_token"]
-        - Multi-part: metadata["user_token_1"], ["user_token_2"], … with
-          metadata["user_token_parts"] indicating the chunk count.
-        """
-        parts_count = metadata.get("user_token_parts")
-        if parts_count is not None:
-            try:
-                n = int(parts_count)
-            except (ValueError, TypeError):
-                return metadata.get("user_token")
-            if n == 1 and "user_token" in metadata:
-                return metadata["user_token"]
-            chunks = []
-            for i in range(1, n + 1):
-                chunk = metadata.get(f"user_token_{i}")
-                if chunk is None:
-                    logger.warning("Missing user_token_%d; expected %d parts", i, n)
-                    return None
-                chunks.append(chunk)
-            return "".join(chunks)
-        # Fallback: single user_token key (backwards compat)
-        return metadata.get("user_token")
-
     async def agent_run(  # pylint: disable=too-many-statements
         self, context: AgentRunContext
     ) -> Union[
@@ -88,16 +60,9 @@ class AgentFrameworkAIAgentAdapter(AgentFrameworkAgent):
             request_context: dict[str, Any] = {}
             if context.headers:
                 request_context.update(context.headers)
-            # Extract user token from request body metadata (Vnext infra strips auth
-            # headers, so the REST API layer embeds the token in metadata instead).
-            # Supports both single-key (user_token) and multi-part split tokens
-            # (user_token_1, user_token_2, … + user_token_parts) for tokens > 512 chars.
             metadata = context.raw_payload.get("metadata", {})
             if isinstance(metadata, dict):
-                user_token = self._extract_user_token(metadata)
-                if user_token:
-                    request_context["authorization"] = f"Bearer {user_token}"
-                    logger.info("[DEBUG] Reassembled user_token from metadata (%d chars)", len(user_token))
+                request_context.update(metadata)
             self._agent._request_headers = request_context  # type: ignore[attr-defined]
 
             # Use split converters
