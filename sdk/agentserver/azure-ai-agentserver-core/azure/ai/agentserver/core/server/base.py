@@ -52,10 +52,6 @@ class AgentRunContextMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.agent = agent
 
-    # Headers to capture from the incoming HTTP request and make available
-    # to the agent invocation via AgentRunContext.headers.
-    _PASSTHROUGH_HEADERS = frozenset({"authorization", "x-request-id", "x-user-authorization"})
-
     async def dispatch(self, request: Request, call_next):
         if request.url.path in ("/runs", "/responses"):
             try:
@@ -65,15 +61,7 @@ class AgentRunContextMiddleware(BaseHTTPMiddleware):
                 logger.error(f"Invalid JSON payload: {e}")
                 return JSONResponse({"error": f"Invalid JSON payload: {e}"}, status_code=400)
             try:
-                # Log all incoming headers for debugging
-                logger.info(f"[DEBUG] All request headers: {dict(request.headers)}")
-                headers = {
-                    k: v
-                    for k, v in request.headers.items()
-                    if k.lower() in self._PASSTHROUGH_HEADERS
-                }
-                logger.info(f"[DEBUG] Captured passthrough headers: {list(headers.keys())}")
-                request.state.agent_run_context = AgentRunContext(payload, headers=headers)
+                request.state.agent_run_context = AgentRunContext(payload)
                 self.set_run_context_to_context_var(request.state.agent_run_context)
             except Exception as e:
                 logger.error(f"Context build failed: {e}.", exc_info=True)
